@@ -70,7 +70,7 @@ const data = [],
   rmin = Rmin*rScale,
   rmax = Rmax*rScale,
   catRange = d3.range(0, 3),
-  textRange = d3.range(0, 12);
+  textRange = d3.range(0, 8);
 
 catRange.forEach(function(j){
   textRange.forEach(function(i){
@@ -81,6 +81,7 @@ catRange.forEach(function(j){
       x: random(rmax, containerWidth - rmax),
       y: random(rmax, containerHeight - rmax),
       r: r,
+      r0: r,
       gX: groupX(random(1, 3)),
       fill: colors[j].fill,
       stroke: colors[j].stroke,
@@ -289,12 +290,12 @@ let baseQ = 100;
 let Q = d => [-baseQ, baseQ, baseQ][d.category];
 let force = d3.forceSimulation(data)
   .force("X", d3.forceX(d => d.gX)
-    .strength(baseG * 10)) //(baseG * containerHeight / containerWidth / 10))
+    .strength(baseG *10)) //(baseG * 10))
   .force("Y", d3.forceY(containerHeight/2)
     .strength(baseG))
   .force("charge", d3.forceManyBody(Q))
   .force("collide", d3.forceCollide(radius).strength(1).iterations(3))
-  .velocityDecay(0.2);
+  .velocityDecay(0.4);
 
 elapsedTime.start(100);
 
@@ -326,12 +327,17 @@ force.on('tick', function t(){
 
 // animate
 window.setInterval(function(){
-  const Tinfl = 3000, Tdefl = 3000, inflate = [200, 10], deflate = "easeOutCubic";
-  const tinfl = cat => [500, Tinfl, Tinfl][+cat];
-  const tdefl = cat => [500, Tdefl, Tdefl][+cat];
+  const Tinfl = 2000, Tdefl = 2000, deflate = "easeOutSine";
+  const tinfl = cat => [500, Tinfl][+~~cat];
+  const tdefl = cat => [500, Tdefl][+~~cat];
+  const inflate = cat => ["easeInSine","easeInSine"][+~~cat];
+  const maxFactor = [1.1, 1.2];
 
   for(let i = 0; i < data.length; i++) {
-    if(Math.random()>0.8) data[i].r = random(rmin,rmax);
+    if(!data.scheduled && Math.random()>0.5) {
+      let d = data[i];
+      d.r = [d.r0, d.r0*maxFactor[d.category]][+(d.r == d.r0)];
+    }
   }
 
   circles.filter(function(d){return !d.scheduled && d.r != d.rt})
@@ -341,9 +347,9 @@ window.setInterval(function(){
         {r: d.r},
         {
           duration: defl ? tdefl(d.category) : tinfl(d.category),
-          easing: defl ? deflate : inflate,
-          begin: transFlag("start", d),
-          complete: transFlag("end", d)
+          easing: defl ? deflate : inflate(d.category),
+          begin: transFlag("start", d, defl),
+          complete: transFlag("end", d, defl)
         });
     });
 
@@ -354,9 +360,9 @@ window.setInterval(function(){
         $(this).velocity({
           x1: -d.r + rmax / 10,
           x2: d.r - rmax / 10
-        }, defl ? tdefl(d.category) : tinfl(d.category), defl ? deflate : inflate)
+        }, defl ? tdefl(d.category) : tinfl(d.category), defl ? deflate : inflate(d.category))
     });
-  function transFlag(event, d){
+  function transFlag(event, d, defl){
     return {
       start: function(){
         window.setTimeout(function() {
@@ -366,10 +372,11 @@ window.setInterval(function(){
       end: function(){
         window.setTimeout(function(){
           d.scheduled = false;
-        }, tinfl(d.category));
+          if(defl) d.r = d.r0;
+        }, 0);
       }
     }[event]
 
   }
 
-}, 500);
+}, 100);
