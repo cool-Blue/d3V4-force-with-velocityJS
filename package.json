@@ -1,0 +1,21 @@
+{
+  "name": "d3-force-transitions",
+  "version": "1.0.0",
+  "description": "force simulation with animated node size collision detection and controlled drift velocity",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "d3js",
+    "force",
+    "simulation",
+    "collision",
+    "detection"
+  ],
+  "author": "cool.blue@y7mail.com",
+  "license": "MIT",
+  "devDependencies": {
+    "rollup": "^0.41.6"
+  }
+}
