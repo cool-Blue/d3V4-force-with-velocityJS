@@ -7,6 +7,8 @@ import {ElapsedTime} from '../src/elapsed-time-3.0'
 import jQuery from "jquery";
 window.$ = window.jQuery = jQuery;
 import '../src/fps-histogram'
+// import collide from '../src/collide'
+
 
 // helpers
 let random = function (min, max) {
@@ -59,34 +61,41 @@ let svgContainer = container
   .attr('width', containerWidth)
   .attr('height', containerHeight);
 
-let groupX = d3.scalePoint()
-  .range([0, containerWidth])
-  .domain([0, 1, 2, 3, 4]);
-
 const data = [],
-  rScale = 0.8,
+  rScale = 0.3,
   Rmin = 30,
   Rmax = 60,
   rmin = Rmin*rScale,
   rmax = Rmax*rScale,
   catRange = d3.range(0, 3),
-  textRange = d3.range(0, 8);
+  textRange = d3.range(0, 16),
+  groupDomain = d3.range(0, 7),
+  groupX = groupDomain.map(
+    d3.scalePoint()
+    .range([0, containerWidth])
+    .domain(groupDomain)
+  ),
+  groupY = groupDomain.map(g => containerHeight/2);
 
 catRange.forEach(function(j){
   textRange.forEach(function(i){
-    var r = random(rmin, rmax);
+    let r = random(rmin, rmax);
+    let group = random(1, 5);
+
     data.push({
       text: i,
       category: j,
-      x: random(rmax, containerWidth - rmax),
-      y: random(rmax, containerHeight - rmax),
+      group: group,
+      x: groupX[group], //containerWidth/2 /*random(rmax, containerWidth - rmax)*/,
+      y: groupY[group] /*random(rmax, containerHeight - rmax)*/,
       r: r,
       r0: r,
-      gX: groupX(random(1, 3)),
+      get gX() { return groupX[this.group]},
+      get gY() { return groupY[this.group]},
       fill: colors[j].fill,
       stroke: colors[j].stroke,
       get v() {
-        var d = this;
+        let d = this;
         return {x: d.vx || 0, y: d.vy || 0}
       },
       set v(v) {
@@ -115,78 +124,51 @@ catRange.forEach(function(j){
   })
 });
 
-// collision detection
-// derived from http://bl.ocks.org/mbostock/1748247
-function collide(alpha, s0) {
-  var quadtree = d3.quadtree(data, d => d.x, d => d.y);
-  return function(d) {
-    var drt = d.rt;
-    applyBoundaries(d, s0);
-    var r = drt + rmax,
-      nx1 = d.x - r,
-      nx2 = d.x + r,
-      ny1 = d.y - r,
-      ny2 = d.y + r;
-    quadtree.visit(function(quad, x1, y1, x2, y2) {
-      var data = quad.data;
-      if (data) {
-        if(data.index > d.index) {
-          var x = d.x - data.x - data.vx,
-            y = d.y - data.y - data.vy,
-            l = x * x + y * y,
-            r = drt + data.rt;
-          if (l < r * r) {
-            l = ((l = Math.sqrt(l)) - r) / l * (1 + alpha);
-            d.x -= x *= l;
-            d.y -= y *= l;
-            data.x += x;
-            data.y += y;
-          }
-        }
-        return;
-      }
-      return x1 > nx2 || x2 < nx1 || y1 > ny2 || y2 < ny1;
-    });
-  };
-}
 function radius(d) {
-  return d.rt;
+  return d.rt*1.1;
 }
-function applyBoundaries(s, s0){
-  function boundaries(d) {
-    var moreThan, v0,
-      drt = d.rt;
-    // boundaries
 
-    //reflect off the edges of the container
-    // check for boundary collisions and reverse velocity if necessary
-    if((moreThan = d.x > (containerWidth - drt)) || d.x < drt) {
-      d.escaped |= 2;
-      // if the object is outside the boundaries
-      //   manage the sign of its x velocity component to ensure it is moving back into the bounds
-      if(~~d.v.x) d.sx = d.v.x * (moreThan && d.v.x > 0 || !moreThan && d.v.x < 0 ? -1 : 1);
-      //   if vx is too small, then steer it back in
-      else d.sx = (~~Math.abs(d.v.y) || Math.min(s0, 1)*2) * (moreThan ? -1 : 1);
-      // clear the boundary without affecting the velocity
-      v0 = d.v;
-      d.x = moreThan ? containerWidth - drt : drt;
-      d.v = v0;
-      // add a bit of hysteresis to quench limit cycles
-    } else if (d.x < (containerWidth - 2*drt) && d.x > 2*drt) d.escaped &= ~2;
+let baseG = 0.1;
+let baseQ = -3000;
+let G = d => [1, 10][+!!d.category] * baseG;
+let force = d3.forceSimulation(data)
+  .force("X", d3.forceX(d => groupX[d.group])
+    .strength(G)) //(baseG * 10))
+  .force("Y", d3.forceY(d => groupY[d.group])
+    .strength(G))
+  .force("charge", d3.forceManyBody(baseQ))
+  // .force("collide", d3.forceCollide(radius).strength(1).iterations(3))
+  .velocityDecay(0.4);
 
-    if((moreThan = d.y > (containerHeight - drt)) || d.y < drt) {
-      d.escaped |= 4;
-      if(~~d.v.y) d.sy = d.v.y * (moreThan && d.v.y > 0 || !moreThan && d.v.y < 0 ? -1 : 1);
-      else d.sy = (~~Math.abs(d.v.x) || Math.min(s0, 1)*2) * (moreThan ? -1 : 1);
-      v0 = d.v;
-      d.y = moreThan ? containerHeight - drt : drt;
-      d.v = v0;
-    }  else  if (d.y < (containerHeight - 2*drt) && d.y > 2*drt) d.escaped &= ~4;
-  }
-  if(s instanceof d3.selection)
-    s.each(boundaries);
-  else
-    boundaries(s);
+elapsedTime.start(100);
+
+// put circle into movement
+force.on('tick', function t(){
+
+  animate();
+
+  const s0 = 0.25, k = 0.3;
+
+  let a = this.alpha();
+  elapsedTime.mark(a);
+  if(elapsedTime.aveLap.history.length)
+    hist(elapsedTime.aveLap.history);
+
+  // regulate the speed of the circles
+  data.forEach(function reg(d){
+    if(d.fx || d.fy) return;
+    if(!d.escaped) d.s =  ([s0*5, s0, s0][+d.category] - d.s * k) / (1 - k);
+  });
+
+  force.force("collide", d3.forceCollide(radius).strength(1).iterations(1));
+
+  node.attr("transform", function position(d){return "translate(" + [d.x, d.y] + ")"});
+
+  force.alpha(0.05);
+});
+function dragstarted() {
+  d3.event.subject.fx = d3.event.subject.x;
+  d3.event.subject.fy = d3.event.subject.y;
 }
 // prepare layout
 
@@ -196,7 +178,6 @@ let node = svgContainer.selectAll('.node')
   .enter()
   .append('g')
   .attr('class', 'node');
-  // .call(force.drag);
 
 // create circles
 let circles = node.append('circle')
@@ -212,7 +193,7 @@ let circles = node.append('circle')
   })
   .each(function(d){
     // add dynamic r getter
-    var n= d3.select(this);
+    let n= d3.select(this);
     Object.defineProperty(d, "rt", {get: function(){
       return +(n.attr("r").replace("px", ""))
     }})
@@ -285,70 +266,57 @@ let lines = node.append('line')
     }})
   });
 
-let baseG = 0.2;
-let baseQ = 100;
-let Q = d => [-baseQ, baseQ, baseQ][d.category];
-let force = d3.forceSimulation(data)
-  .force("X", d3.forceX(d => d.gX)
-    .strength(baseG *10)) //(baseG * 10))
-  .force("Y", d3.forceY(containerHeight/2)
-    .strength(baseG))
-  .force("charge", d3.forceManyBody(Q))
-  .force("collide", d3.forceCollide(radius).strength(1).iterations(3))
-  .velocityDecay(0.4);
+function dragged() {
+  let d = d3.event.subject;
+  d.fx = d3.event.x;
+  d.fy = d3.event.y;
+  if(d.category == 0) return;
+  groupX[d.group] = d.x;
+  groupY[d.group] = d.y;
+  force.force('X').initialize(force.nodes());
+  force.force('Y').initialize(force.nodes());
+}
 
-elapsedTime.start(100);
-
-// put circle into movement
-force.on('tick', function t(){
-  const s0 = 0.25, k = 0.3;
-
-  let a = this.alpha();
-  elapsedTime.mark(a);
-  if(elapsedTime.aveLap.history.length)
-    hist(elapsedTime.aveLap.history);
-
-  for ( let i = 0; i < 2; i++) {
-    circles
-      .call(applyBoundaries, s0);
-  }
-
-  // regulate the speed of the circles
-  data.forEach(function reg(d){
-    if(!d.escaped) d.s =  ([s0*5, s0, s0][+d.category] - d.s * k) / (1 - k);
-  });
-
-  node.attr("transform", function position(d){return "translate(" + [d.x, d.y] + ")"});
-
-  force.force("collide", d3.forceCollide(radius).strength(1).iterations(3));
-
-  force.alpha(0.05);
-});
+function dragended() {
+  let d = d3.event.subject;
+  d.fx = null;
+  d.fy = null;
+  groupX[d.group] = d.x;
+  groupY[d.group] = d.y;
+  force.force('X').initialize(force.nodes());
+  force.force('Y').initialize(force.nodes());
+}
+node.call(d3.drag()
+  .on("start", dragstarted)
+  .on("drag", dragged)
+  .on("end", dragended));
 
 // animate
-window.setInterval(function(){
-  const Tinfl = 2000, Tdefl = 2000, deflate = "easeOutSine";
-  const tinfl = cat => [500, Tinfl][+~~cat];
-  const tdefl = cat => [500, Tdefl][+~~cat];
-  const inflate = cat => ["easeInSine","easeInSine"][+~~cat];
-  const maxFactor = [1.1, 1.2];
+function animate(){
+  const Tinfl = 2000, Tdefl = 2000;
+  const tinfl = cat => [300, Tinfl][+!!cat];
+  const tdefl = cat => [300, Tdefl][+!!cat];
+  const inflate = cat => ["easeInOutSine", "easeInOutSine"][+!!cat];
+  const deflate = cat => ["easeInOutSine", "easeInOutSine"][+!!cat];
+  const maxFactor = [1.2, 1.3];
 
   for(let i = 0; i < data.length; i++) {
-    if(!data.scheduled && Math.random()>0.5) {
+    if(!data.scheduled && Math.random()>0.8) {
       let d = data[i];
-      d.r = [d.r0, d.r0*maxFactor[d.category]][+(d.r == d.r0)];
+      d.r = [d.r0, d.r0*maxFactor[+!!d.category]][+(d.r == d.r0)];
     }
   }
 
-  circles.filter(function(d){return !d.scheduled && d.r != d.rt})
+  circles.filter(d => !d.scheduled && d.r != d.rt)
     .each(function(d) {
       let delta = d.r - d.rt, defl = delta < 0;
       if(~~delta) $(this).velocity(
         {r: d.r},
         {
           duration: defl ? tdefl(d.category) : tinfl(d.category),
-          easing: defl ? deflate : inflate(d.category),
+          easing: defl ? deflate(d.category) : inflate(d.category),
           begin: transFlag("start", d, defl),
+          progress: _collide,
           complete: transFlag("end", d, defl)
         });
     });
@@ -360,7 +328,7 @@ window.setInterval(function(){
         $(this).velocity({
           x1: -d.r + rmax / 10,
           x2: d.r - rmax / 10
-        }, defl ? tdefl(d.category) : tinfl(d.category), defl ? deflate : inflate(d.category))
+        }, defl ? tdefl(d.category) : tinfl(d.category), defl ? deflate(d.category) : inflate(d.category))
     });
   function transFlag(event, d, defl){
     return {
@@ -375,8 +343,12 @@ window.setInterval(function(){
           if(defl) d.r = d.r0;
         }, 0);
       }
-    }[event]
-
+    }[event];
   }
 
-}, 100);
+  function _collide() {
+    force.force("collide", d3.forceCollide(radius).strength(1).iterations(1));
+  }
+
+}
+// window.setInterval(animate, 100);
