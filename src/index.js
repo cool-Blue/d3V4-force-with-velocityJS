@@ -4,8 +4,8 @@
  */
 import d3 from 'd3'
 import {ElapsedTime} from '../src/elapsed-time-3.0'
-import jQuery from "jquery";
-window.$ = window.jQuery = jQuery;
+// import jQuery from "jquery";
+// window.$ = window.jQuery = jQuery;
 import '../src/fps-histogram'
 // import collide from '../src/collide'
 
@@ -36,7 +36,8 @@ let random = function (min, max) {
       return 1 / d
     },
     domain: [0, 60]
-  }),  // mock data
+  }),
+  // mock data
   colors = [
     {
       fill: 'rgba(242,216,28,0.3)',
@@ -60,6 +61,9 @@ let svgContainer = container
   .append('svg')
   .attr('width', containerWidth)
   .attr('height', containerHeight);
+let jiggle = function() {
+  return (Math.random() - 0.5) * 1e-6;
+};
 
 const data = [],
   rScale = 0.3,
@@ -78,7 +82,7 @@ const data = [],
   ),
   groupY = groupDomain.map(g => containerHeight/2),
   groupXY = groupDomain.map((d, i) => {
-    return {x: containerWidth/2, y: containerHeight/2}
+    return {x: containerWidth/2 + jiggle(), y: containerHeight/2 + jiggle()}
   });
 
 catRange.forEach(function(j){
@@ -139,8 +143,8 @@ let layout = (function(){
   function init(data){
 
     data.forEach(function(d){
-      d.x = d.gX;
-      d.y = d.gY;
+      d.x = d.gX + jiggle();
+      d.y = d.gY + jiggle();
     });
 
     let G = d => [1, 10][+!!d.category] * baseG;
@@ -149,10 +153,13 @@ let layout = (function(){
         .strength(G)) //(baseG * 10))
       .force("Y", d3.forceY(d => groupXY[d.group].y)
         .strength(G))
-      .force("charge", d3.forceManyBody(baseQ))
-      // .force("collide", d3.forceCollide(radius).strength(1).iterations(3))
+      // .force("charge", d3.forceManyBody(baseQ))
+      .force("collide", d3.forceCollide(radius).strength(1).iterations(3))
       .alphaTarget(0.05)
-      .velocityDecay(0.4);
+      .velocityDecay(0.4)
+      .alpha(0.05);
+
+    // force.stop();
 
     elapsedTime.start(100);
 
@@ -191,7 +198,7 @@ let layout = (function(){
       .styles({
         'fill': '#ffffff',
         'text-anchor': 'middle',
-        'font-size': (10 * rScale) + 'px',
+        'font-size': (12 * rScale) + 'px',
         'font-weight': 'bold',
         'text-transform': 'uppercase',
         'font-family': 'Tahoma, Arial, sans-serif'
@@ -205,20 +212,20 @@ let layout = (function(){
 
     node.append('text')
       .text(function(d) {
-        return 'cat' + d.category
+        return 'Cat ' + d.category
       })
       .classed('category', true)
       .styles({
         'fill': '#ffffff',
         'font-family': 'Tahoma, Arial, sans-serif',
         'text-anchor': 'middle',
-        'font-size': '8px'
+        'font-size': (12 * rScale) + 'px'
       })
       .attr('x', function (d) {
         return 0;
       })
       .attr('y', function (d) {
-        return rmax/4;
+        return rmax/3;
       });
 
     lines = node.append('line')
@@ -291,6 +298,7 @@ let layout = (function(){
 
     force.force('X').initialize(force.nodes());
     force.force('Y').initialize(force.nodes());
+    force.force("collide").initialize(force.nodes());
 
     animate();
 
@@ -302,19 +310,15 @@ let layout = (function(){
       hist(elapsedTime.aveLap.history);
 
     // regulate the speed of the circles
-    data.forEach(function reg(d){
-      if(d.fx || d.fy) return;
-      if(!d.escaped) d.s =  ([s0*5, s0, s0][+d.category] - d.s * k) / (1 - k);
-    });
-
-    force.force("collide", d3.forceCollide(radius).strength(1).iterations(1));
+    // data.forEach(function reg(d){
+    //   if(d.fx || d.fy) return;
+    //   if(!d.escaped) d.s =  ([s0*5, s0, s0][+d.category] - d.s * k) / (1 - k);
+    // });
 
     node
       .attr("transform", function position(d){
         return "translate(" + [d.x, d.y] + ")"
       });
-
-    force.alpha(0.05);
   }
 
 // animate
@@ -336,13 +340,13 @@ let layout = (function(){
     circles.filter(d => !d.scheduled && d.r != d.rt)
       .each(function(d) {
         let delta = d.r - d.rt, defl = delta < 0;
-        if(~~delta) $(this).velocity(
+        if(~~delta) Velocity(this,
           {r: d.r},
           {
             duration: defl ? tdefl(d.category) : tinfl(d.category),
             easing: defl ? deflate(d.category) : inflate(d.category),
             begin: transFlag("start", d, defl),
-            progress: _collide,
+            // progress: _collide,
             complete: transFlag("end", d, defl)
           });
       });
@@ -351,7 +355,7 @@ let layout = (function(){
       .each(function(d) {
         let delta = d.r - d.rt, defl = delta < 0;
         if(~~delta)
-          $(this).velocity({
+          Velocity(this, {
             x1: -d.r + rmax / 10,
             x2: d.r - rmax / 10
           }, defl ? tdefl(d.category) : tinfl(d.category), defl ? deflate(d.category) : inflate(d.category))
@@ -373,11 +377,13 @@ let layout = (function(){
     }
 
     function _collide() {
-      force.force("collide", d3.forceCollide(radius).strength(1).iterations(1));
+      force.tick();
     }
 
   }
-  return {t: t, init: init,
+  return {
+    t: t,
+    init: init,
     handover(){
       if(typeof force == "undefined") return;
       force.on('tick', t)
@@ -392,18 +398,17 @@ let groupR = 60;
 let alphaTarget = 0.05;
 let forceEvents = d3.dispatch('cooled');
 let outerForce = d3.forceSimulation(groupXY)
-  // .force("center", d3.forceCenter(containerWidth/2, containerHeight/2))
+  .force("center", d3.forceCenter(containerWidth/2, containerHeight/2))
   .force('X', d3.forceX(containerWidth/2).strength(baseG*containerHeight/containerWidth))
   .force('Y', d3.forceY(containerHeight/2).strength(baseG*containerWidth/containerHeight))
   // .force('Y', d3.forceY())
-  .force("charge", d3.forceManyBody(100))
+  // .force("charge", d3.forceManyBody(100))
   .force("Gcollide", d3.forceCollide(groupR*1.5))
   // .alphaTarget(alphaTarget)
   .on('tick.main', function() {
     groupNodes.attr("transform", function position(d){return "translate(" + [d.x, d.y] + ")"});
     if(this.alpha() > 0.7) return;
     layout.t();
-    console.log(this.alpha());
   })
   .on('tick.emerge', function(){
     if(this.alpha() > 0.7) return;
