@@ -91,7 +91,7 @@
 			}
 			return this
 		};
-		elapsedTime.t = function() {
+		elapsedTime.tick = function() {
 			return d3.format(" >8,.3f")((window.performance.now() - this.startTime) / 1000)
 		};
 		elapsedTime.mark = function(f) {

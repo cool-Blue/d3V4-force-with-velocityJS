@@ -93,8 +93,8 @@ export default function(radius) {
             data.vx -= x * (r = 1 - r);
             data.vy -= y * r;
 
-            node.x += x *= l;
-            node.y += y *= l;
+            node.x += x;
+            node.y += y;
             data.x -= x;
             data.y -= y;
           }

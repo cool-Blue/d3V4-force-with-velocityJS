@@ -56,14 +56,21 @@ d3.ui.FpsMeter = function Histogram(on, style, config) {
   gradient.append("stop")
     .attrs({"offset": "100%", "stop-color": "green"});
 
+  let x = d3.scaleLinear()
+    .range([0, config.width]);
+  if(config.domain){
+    x.domain(config.domain)
+    _xAxis.scale(x);
+    xG.call(xAxis);
+  }
   update(d3.range(BINS));
 
   function update(data) {
     if (!data || !data.length) return;
-    let x = d3.scaleLinear()
-        .domain(config.domain || [0, d3.max(data, config.values)])
+    let _x = config.domain ? x : d3.scaleLinear()
+        .domain([0, d3.max(data, config.values)])
         .range([0, config.width]),
-      h = makeHist(data, config.values, x),
+      h = makeHist(data, config.values, _x),
       y = d3.scaleLinear()
         .domain([0, d3.max(h, function (d) {
           return d.length
@@ -76,10 +83,10 @@ d3.ui.FpsMeter = function Histogram(on, style, config) {
         class: "bar",
         opactity: 1,
         width: function (d) {
-          return x(d.x1 - d.x0)
+          return _x(d.x1 - d.x0)
         },
         x: function (d) {
-          return x(d.x0)
+          return _x(d.x0)
         }
       });
 
@@ -88,8 +95,11 @@ d3.ui.FpsMeter = function Histogram(on, style, config) {
     bars.attr("height", function (d) {
       return y(d.length)
     });
-    _xAxis.scale(x);
-    xG.call(xAxis);
+
+    if(!config.domain) {
+      _xAxis.scale(_x);
+      xG.call(xAxis);
+    }
   }
 
   return update;
