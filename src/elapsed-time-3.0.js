@@ -1,7 +1,7 @@
 ﻿// <script src="https://gitcdn.xyz/repo/cool-Blue/d3-lib/master/elapsedTime/elapsedTime/elapsed%20time%201.0.js"></script>
 
-  import d3 from 'd3'
-  import 'd3SelectionMulti'
+import * as d3 from 'd3'
+import 'd3-selection-multi'
 
 	console.warn("elapsed-time-2.0.js");
 	(function() {

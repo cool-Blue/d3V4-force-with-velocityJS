@@ -16,6 +16,13 @@
   "author": "cool.blue@y7mail.com",
   "license": "MIT",
   "devDependencies": {
-    "rollup": "^0.41.6"
+    "rollup": "^0.41.6",
+    "rollup-plugin-inject": "^2.0.0",
+    "rollup-plugin-node-resolve": "^2.1.1",
+    "rollup-plugin-replace": "^1.1.1"
+  },
+  "dependencies": {
+    "d3": "^4.7.4",
+    "d3-selection-multi": "^1.0.1"
   }
 }

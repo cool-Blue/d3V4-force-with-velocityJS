@@ -2,13 +2,13 @@
  * index
  * Created by cool.blue on 20/03/2017.
  */
-import d3 from 'd3'
+import * as d3 from 'd3'
+import 'd3-selection-multi'
 import {ElapsedTime} from '../src/elapsed-time-3.0'
 // import jQuery from "jquery";
 // window.$ = window.jQuery = jQuery;
 import '../src/fps-histogram'
 // import collide from '../src/collide'
-
 
 // helpers
 let random = function (min, max) {
@@ -278,6 +278,7 @@ let layout = (function(){
     }
 
     nodes.call(d3.drag()
+      .subject(() => force.find(d3.event.x, d3.event.y))
       .on("start", dragstarted)
       .on("drag", dragged)
       .on("end", dragended));

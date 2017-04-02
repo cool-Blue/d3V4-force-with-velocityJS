@@ -9,7 +9,7 @@
  *  - attr object
  */
 
-import d3 from 'd3'
+import * as d3 from 'd3'
 
 export function transplot(yRange){
 	return {"transform": "matrix(" + [1, 0, 0, -1, 0, yRange] + ")"};

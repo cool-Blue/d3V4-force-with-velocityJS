@@ -1,8 +1,8 @@
 /**
  * fps-histogram
  */
-import d3 from 'd3'
-import 'd3SelectionMulti'
+import * as d3 from 'd3'
+import 'd3-selection-multi'
 import {transplot} from '../src/plot-transform'
 
 d3.ui = d3.ui || {};
