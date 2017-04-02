@@ -2,12 +2,14 @@
  * index
  * Created by cool.blue on 20/03/2017.
  */
-import * as d3 from 'd3'
+import FpsMeter from '../src/d3-fps-histogram'
+import {select, event} from 'd3-selection'
 import 'd3-selection-multi'
-import {ElapsedTime} from '../src/elapsed-time-3.0'
-// import jQuery from "jquery";
-// window.$ = window.jQuery = jQuery;
-import '../src/fps-histogram'
+import {drag} from 'd3-drag'
+import {dispatch} from 'd3-dispatch'
+import {format} from 'd3-format'
+import {forceSimulation, forceX, forceY, forceCollide, forceCenter} from 'd3-force'
+import {range} from 'd3-array'
 // import collide from '../src/collide'
 
 // helpers
@@ -18,25 +20,19 @@ let random = function (min, max) {
     }
     return min + Math.floor(Math.random() * (max - min + 1));
   },
-  metrics = d3.select('#bubble-cloud').append("div")
+  metrics = select('#bubble-cloud').append("div")
     .attr("id", "metrics")
     .style("white-space", "pre"),
-  elapsedTime = ElapsedTime("#metrics", {
-    border: 0, margin: 0, "box-sizing": "border-box",
-    padding: "0 0 0 6px", background: "black", "color": "orange"
-  })
-    .message(function (value) {
-      let this_lap = this.lap().lastLap, aveLap = this.aveLap(this_lap);
-      return 'alpha:' + d3.format(" >7,.3f")(value)
-        + '\tframe rate:' + d3.format(" >4,.1f")(1 / aveLap) + " fps"
-    }),
-  hist = d3.ui.FpsMeter("#metrics", {display: "inline-block"}, {
+  hist = FpsMeter("#metrics", {display: "inline-block"}, {
     height: 10, width: 100,
     values: function (d) {
       return 1 / d
     },
     domain: [0, 60]
-  }),
+  })
+    .message(function (this_lap, aveLap) {
+      return 'lap:' + format(" >4,.1f")(1 / aveLap)
+    }),
   // mock data
   colors = [
     {
@@ -54,9 +50,9 @@ let random = function (min, max) {
   ];
 
 // initialize
-let container = d3.select('#bubble-cloud');
+let container = select('#bubble-cloud');
 const containerWidth = 960;
-let containerHeight = 470 - elapsedTime.selection.node().clientHeight;
+let containerHeight = 470 - hist.selection.node().clientHeight;
 let svgContainer = container
   .append('svg')
   .attr('width', containerWidth)
@@ -72,10 +68,10 @@ const data = [],
   Rmax = 60,
   rmin = Rmin*rScale,
   rmax = Rmax*rScale,
-  catRange = d3.range(0, 3),
-  textRange = d3.range(0, 24),
+  catRange = range(0, 3),
+  textRange = range(0, 24),
   groups = 9,
-  groupDomain = d3.range(groups + 1),
+  groupDomain = range(groups + 1),
   groupXY = groupDomain.map((d, i) => {
     return {x: containerWidth/2 + jiggle(), y: containerHeight/2 + jiggle()}
   });
@@ -143,12 +139,12 @@ let layout = (function(){
     });
 
     let G = d => [1, 10][+!!d.category] * baseG;
-    force = d3.forceSimulation(data)
-      .force("X", d3.forceX(d => groupXY[d.group].x)
+    force = forceSimulation(data)
+      .force("X", forceX(d => groupXY[d.group].x)
         .strength(G)) //(baseG * 10))
-      .force("Y", d3.forceY(d => groupXY[d.group].y)
+      .force("Y", forceY(d => groupXY[d.group].y)
         .strength(G))
-      .force("collide", d3.forceCollide(radius).strength(1).iterations(3))
+      .force("collide", forceCollide(radius).strength(1).iterations(3))
       // .force("collide", collide(radius).strength(1).iterations(3))
       .alphaTarget(0.05)
       // .velocityDecay(0.4)
@@ -156,7 +152,7 @@ let layout = (function(){
 
     force.stop();
 
-    elapsedTime.start(100);
+    hist.start(100);
 
     nodes = svgContainer.selectAll('.nodes')
       .data(data)
@@ -178,7 +174,7 @@ let layout = (function(){
       })
       .each(function(d){
         // add dynamic r getter
-        let n= d3.select(this);
+        let n= select(this);
         Object.defineProperty(d, "rt", {get: function(){
           return +(n.attr("r").replace("px", ""))
         }})
@@ -245,7 +241,7 @@ let layout = (function(){
       })
       .each(function(d){
         // add dynamic x getter
-        var n= d3.select(this);
+        var n= select(this);
         Object.defineProperty(d, "lxt", {get: function(){
           return {x1: +n.attr("x1").replace("px", ""), x2: +n.attr("x2").replace("px", "")}
         }})
@@ -253,13 +249,13 @@ let layout = (function(){
 
     function dragstarted() {
       outerForce.restart().alpha(0.1);
-      d3.event.subject.fx = d3.event.subject.x;
-      d3.event.subject.fy = d3.event.subject.y;
+      event.subject.fx = event.subject.x;
+      event.subject.fy = event.subject.y;
     }
     function dragged() {
-      let d = d3.event.subject;
-      d.fx = d3.event.x;
-      d.fy = d3.event.y;
+      let d = event.subject;
+      d.fx = event.x;
+      d.fy = event.y;
       if(d.category == 0) return;
       groupXY[d.group].x = d.x;
       groupXY[d.group].y = d.y;
@@ -268,7 +264,7 @@ let layout = (function(){
     }
 
     function dragended() {
-      let d = d3.event.subject;
+      let d = event.subject;
       d.fx = null;
       d.fy = null;
       groupXY[d.group].x = d.x;
@@ -277,8 +273,8 @@ let layout = (function(){
       force.force('Y').initialize(force.nodes());
     }
 
-    nodes.call(d3.drag()
-      .subject(() => force.find(d3.event.x, d3.event.y))
+    nodes.call(drag()
+      .subject(() => force.find(event.x, event.y))
       .on("start", dragstarted)
       .on("drag", dragged)
       .on("end", dragended));
@@ -300,9 +296,7 @@ let layout = (function(){
     const s0 = 0.25, k = 0.3;
 
     let a = force.alpha();
-    elapsedTime.mark(a);
-    if(elapsedTime.aveLap.history.length)
-      hist(elapsedTime.aveLap.history);
+    hist.mark(a);
 
     // regulate the speed of the circles
     data.forEach(function reg(d){
@@ -381,7 +375,7 @@ let layout = (function(){
       }, 0)
     })();
     function animationTick(d, line) {
-      d3.select(line).attrs({
+      select(line).attrs({
         x1: -d.rt + rmax / 10,
         x2: d.rt - rmax / 10
       });
@@ -408,13 +402,12 @@ let baseQ = -300;
 
 let groupR = 60;
 let alphaCool = 0.7;
-let forceEvents = d3.dispatch('cooled');
-let outerForce = d3.forceSimulation(groupXY)
-  .force("center", d3.forceCenter(containerWidth/2, containerHeight/2))
-  .force('X', d3.forceX(containerWidth/2).strength(baseG*containerHeight/containerWidth))
-  .force('Y', d3.forceY(containerHeight/2).strength(baseG*containerWidth/containerHeight))
-  // .force("charge", d3.forceManyBody(100))
-  .force("Gcollide", d3.forceCollide(groupR*1.5))
+let forceEvents = dispatch('cooled');
+let outerForce = forceSimulation(groupXY)
+  .force("center", forceCenter(containerWidth/2, containerHeight/2))
+  .force('X', forceX(containerWidth/2).strength(baseG*containerHeight/containerWidth))
+  .force('Y', forceY(containerHeight/2).strength(baseG*containerWidth/containerHeight))
+  .force("Gcollide", forceCollide(groupR*1.5))
   // .alphaTarget(alphaTarget)
   .on('tick.main', function() {
     groupNodes.attr("transform", function position(d){return "translate(" + [d.x, d.y] + ")"});

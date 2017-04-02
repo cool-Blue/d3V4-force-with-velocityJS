@@ -1,9 +1,9 @@
 ﻿// <script src="https://gitcdn.xyz/repo/cool-Blue/d3-lib/master/elapsedTime/elapsedTime/elapsed%20time%201.0.js"></script>
 
-import * as d3 from 'd3'
+import {select} from 'd3-selection'
+import {format} from 'd3-format'
 import 'd3-selection-multi'
 
-	console.warn("elapsed-time-2.0.js");
 	(function() {
 		//polly-fill for safari
 		if("performance" in window == false) {
@@ -32,7 +32,7 @@ import 'd3-selection-multi'
 		//constructor
 		function _OutputDiv(on, style, before) {
 			//private instance state
-			let _sel     = d3.select(on), id = ~~(Math.random() * 1000),
+			let _sel     = select(on), id = ~~(Math.random() * 1000),
 					_style   = merge({
 						margin       : '10px 10px 10px 0',
 						padding      : '3px 3px 3px 3px',
@@ -92,7 +92,7 @@ import 'd3-selection-multi'
 			return this
 		};
 		elapsedTime.tick = function() {
-			return d3.format(" >8,.3f")((window.performance.now() - this.startTime) / 1000)
+			return format(" >8,.3f")((window.performance.now() - this.startTime) / 1000)
 		};
 		elapsedTime.mark = function(f) {
 			if(this.running) {
@@ -110,8 +110,8 @@ import 'd3-selection-multi'
 			return this
 		};
 		elapsedTime.message(function(value) {
-			return 'time elapsed : ' + d3.format(",.3f")(value)
-				+ ' sec\t' + d3.format(",d")(this.ticks)
+			return 'time elapsed : ' + format(",.3f")(value)
+				+ ' sec\t' + format(",d")(this.ticks)
 		});
 		elapsedTime.stop = function() {
 			this.running = false;
@@ -121,7 +121,7 @@ import 'd3-selection-multi'
 			if(this.consoleOn) {
 				let _caller = (caller && caller.callee) ? /function\s+(\w*)\(/.exec(caller.callee)[1] : caller;
 				this.mark(function(t) {
-					console.log(d3.format(" >8,.6f")(t / 1000) + (_caller ? "\t" + _caller + (message ? "\t"
+					console.log(format(" >8,.6f")(t / 1000) + (_caller ? "\t" + _caller + (message ? "\t"
 						+ message : "") : ""))
 				})
 			}

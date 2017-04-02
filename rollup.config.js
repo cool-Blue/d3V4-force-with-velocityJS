@@ -4,12 +4,9 @@
 import resolve from 'rollup-plugin-node-resolve';
 
 export default {
-  entry: 'test.js',
-  dest: 'bundle.js',
+  entry: 'src/index.js',
+  dest: 'build/js/bundle.js',
   format: 'umd',
-  globals: {
-    d3: 'd3'
-  },
   plugins: [
     resolve({ jsnext: true })
   ]
