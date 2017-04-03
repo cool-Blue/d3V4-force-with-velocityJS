@@ -10,6 +10,7 @@ import {dispatch} from 'd3-dispatch'
 import {format} from 'd3-format'
 import {forceSimulation, forceX, forceY, forceCollide, forceCenter} from 'd3-force'
 import {range} from 'd3-array'
+import animate from './animate';
 // import collide from '../src/collide'
 
 // helpers
@@ -30,8 +31,8 @@ let random = function (min, max) {
     },
     domain: [0, 60]
   })
-    .message(function (this_lap, aveLap) {
-      return 'lap:' + format(" >4,.1f")(1 / aveLap)
+    .message(function (value, this_lap, aveLap) {
+      return 'alpha:' + format(" >7,.3f")(value)
     }),
   // mock data
   colors = [
@@ -71,6 +72,9 @@ const data = [],
   catRange = range(0, 3),
   textRange = range(0, 24),
   groups = 9,
+  // catRange = range(2),
+  // textRange = range(1),
+  // groups = 0,
   groupDomain = range(groups + 1),
   groupXY = groupDomain.map((d, i) => {
     return {x: containerWidth/2 + jiggle(), y: containerHeight/2 + jiggle()}
@@ -144,7 +148,7 @@ let layout = (function(){
         .strength(G)) //(baseG * 10))
       .force("Y", forceY(d => groupXY[d.group].y)
         .strength(G))
-      .force("collide", forceCollide(radius).strength(1).iterations(3))
+      .force("collide", forceCollide(radius).strength(1).iterations(1))
       // .force("collide", collide(radius).strength(1).iterations(3))
       .alphaTarget(0.05)
       // .velocityDecay(0.4)
@@ -273,11 +277,14 @@ let layout = (function(){
       force.force('Y').initialize(force.nodes());
     }
 
-    nodes.call(drag()
+    svgContainer.call(drag()
       .subject(() => force.find(event.x, event.y))
       .on("start", dragstarted)
       .on("drag", dragged)
       .on("end", dragended));
+
+    tick.force = force;
+    tick.nodes = nodes;
 
     // force.force("collide").initialize(force.nodes());
     t();
@@ -289,20 +296,19 @@ let layout = (function(){
 
     if(typeof force == "undefined") return;
 
-    force.force('X').initialize(force.nodes());
-    force.force('Y').initialize(force.nodes());
-    force.force("collide").initialize(force.nodes());
-
     const s0 = 0.25, k = 0.3;
-
-    let a = force.alpha();
-    hist.mark(a);
-
     // regulate the speed of the circles
     data.forEach(function reg(d){
       if(d.fx || d.fy) return;
       if(!d.escaped) d.s =  ([s0*5, s0, s0][+d.category] - d.s * k) / (1 - k);
     });
+
+    force.force('X').initialize(force.nodes());
+    force.force('Y').initialize(force.nodes());
+    force.force("collide").initialize(force.nodes());
+
+    let a = force.alpha();
+    hist.mark(a);
 
     nodes
       .attr("transform", function position(d){
@@ -310,90 +316,15 @@ let layout = (function(){
       });
     return this;
   }
-
-// animate
-  function animate(){
-    const Tinfl = 2000, Tdefl = 2000;
-    const tinfl = cat => [300, Tinfl][+!!cat];
-    const tdefl = cat => [300, Tdefl][+!!cat];
-    const inflate = cat => ["easeInOutSine", "easeInOutSine"][+!!cat];
-    const deflate = cat => ["easeInOutSine", "easeInOutSine"][+!!cat];
-    const maxFactor = [1.2, 1.3];
-
-    if (typeof(nodes) === 'undefined') return;
-
-    // feed the cat 0 nodes in a bit randomly
-    nodes
-      .filter(d => !d.scheduled && Math.random()>0.8)
-      .each(function breath(d) {
-        let target = this;
-        let circle = target.getElementsByTagName('circle')[0];
-        let line = target.getElementsByTagName('line')[0];
-        window.setTimeout(function() {
-          d.scheduled = true;
-        }, 0);
-
-      (function breath() {
-        Velocity(circle,
-          {r: d.r0 * maxFactor[+!!d.category]},
-          {
-            duration: tinfl(d.category),
-            easing: inflate(d.category),
-            progress: function () {
-              animationTick(d, line);
-            }
-          })
-          .then(() => Velocity(circle,
-            {r: d.r0},
-            {
-              duration: tdefl(d.category),
-              easing: deflate(d.category),
-              progress: function () {
-                animationTick(d, line);
-              },
-              complete: breath.bind(this, d)
-            }));
-      }).call(target);
-    });
-
-    // Drive the force simulation from here
-    // itr needs a node as the first argument so just use the container
-    (function vTick() {
-      Velocity(container.node(), {
-        progress: function () {
-
-          // nodes.each(function(d){
-          //   let trans = this.getCTM();
-          //   console.log(`x: ${d.x}\t${trans.e}\ty: ${d.y}\t${trans.f}`);
-          // });
-
-          force.tick();
-          t();
-        },
-        loop: true,
-        complete: vTick
-      }, 0)
-    })();
-    function animationTick(d, line) {
-      select(line).attrs({
-        x1: -d.rt + rmax / 10,
-        x2: d.rt - rmax / 10
-      });
-    }
-    return this;
+  // remote tick function
+  function tick(){
+    if(typeof force == "undefined") return;
+    force.tick();
+    t()
   }
   return {
-    tick: function(){
-      if(typeof force == "undefined") return;
-      force.tick();
-      t()
-    },
     init: init,
-    animate: animate,
-    handover(){
-      if(typeof force == "undefined") return;
-      force.on('tick', t).restart();
-    }
+    animate: animate({tick: tick, rmax: rmax, renderer: "d3"}),
   }
 })();
 
@@ -413,14 +344,12 @@ let outerForce = forceSimulation(groupXY)
     groupNodes.attr("transform", function position(d){return "translate(" + [d.x, d.y] + ")"});
     if(this.alpha() > alphaCool) return;
     layout.animate(); // start the animations
-    // layout.tick();
   })
   .on('tick.emerge', function(){
     if(this.alpha() > alphaCool) return;
     layout.init(data);
     this.on('tick.emerge', null);
   });
-  // .on('end', layout.handover);
 
 // outer group
 let groupNodes = svgContainer.selectAll('.group-node')
