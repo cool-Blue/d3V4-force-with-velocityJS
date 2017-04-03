@@ -12,6 +12,7 @@
         }
 
         #histogram rect{
+            will-change: height;
             -webkit-transition: all 0.1s linear;
             -moz-transition: all 0.1s linear;
             -o-transition: all 0.1s linear;
@@ -35,10 +36,17 @@
             stroke: red;
             fill: none;
         }
-        .node circle {
+        .nodes circle {
             cursor: pointer;
+            will-change: r, cx, cy;
+            /*will-change: transform;*/
         }
-        .node text {
+        .nodes line {
+            cursor: pointer;
+            will-change: x1, x2;
+            /*will-change: transform;*/
+        }
+        .nodes text {
             pointer-events: none;
         }
     </style>

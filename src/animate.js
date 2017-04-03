@@ -2,6 +2,8 @@
  * Created by cool.blue on 3/04/2017.
  */
 import {select} from "d3-selection";
+import 'd3-selection-multi'
+import {transition} from 'd3-transition'
 import * as ease from "d3-ease";
 import {timer} from "d3-timer";
 // animate
@@ -56,8 +58,9 @@ const animationLoop = {
     }, 0)
   },
   d3: function tt(){
-      // tick();
-      // window.setTimeout(() => window.requestAnimationFrame(tt), 160)
+    timer(tick)
+  },
+  d3Scale: function tt(){
     timer(tick)
   }
 };
@@ -67,8 +70,8 @@ function updateLine(d) {
     x1: -d.rt + rmax / 10,
     x2: d.rt - rmax / 10
   });
-  let x1 = l.attr('x1'), x2 = l.attr('x2');
-  console.log((d.rt*2*0.8 - Math.abs(x1-x2))/(rmax))
+  // let x1 = l.attr('x1'), x2 = l.attr('x2');
+  // console.log((d.rt*2*0.8 - Math.abs(x1-x2))/(rmax))
 }
 const breath = {
   Velocity: function (line, d) {
@@ -95,26 +98,68 @@ const breath = {
         }))
     })();
   },
-  d3: function (line, d) {
+  d3: function (lineElement, d) {
     let circle = select(this);
+    let line = select(lineElement);
     let f = 1;
+
+      (function breath() {
+        let tInflate =  transition()
+            .duration(tinfl(d.category)*f)
+            .ease(d3Ease(inflate(d.category))),
+          rInf =  d.r0 * maxFactor[+!!d.category];
+
+        let tDeflate =  transition()
+          .duration(tdefl(d.category)*f)
+          .ease(d3Ease(deflate(d.category)));
+
+        circle
+          .transition(tInflate)
+          .attr('r', rInf)
+          .transition(tDeflate)
+          .attr('r', d.r0)
+          .on('end', breath);
+
+        line
+          .transition(tInflate)
+          .attrs({
+            x1: -rInf + rmax / 10,
+            x2: rInf - rmax / 10
+          })
+          .transition(tDeflate)
+          .attrs({
+            x1: -d.r0 + rmax / 10,
+            x2: d.r0 - rmax / 10
+          })
+      })()
+  },
+  d3Scale: function (lineElement, d) {
+    let circle = select(this);
+    let line = select(lineElement);
+    let f = 1;
+
     (function breath() {
-      circle
-        .transition()
-        .duration(tinfl(d.category)*f)
-        .ease(d3Ease(inflate(d.category)))
-        .tween('line.adjust', () => function () {
-          updateLine.call(line, d)
-        })
-        .attr('r', d.r0 * maxFactor[+!!d.category])
-        .transition()
+      let tInflate =  transition()
+          .duration(tinfl(d.category)*f)
+          .ease(d3Ease(inflate(d.category))),
+        scaleInf =  maxFactor[+!!d.category];
+
+      let tDeflate =  transition()
         .duration(tdefl(d.category)*f)
-        .ease(d3Ease(deflate(d.category)))
-        .tween('line.adjust', () => function () {
-          updateLine.call(line, d)
-        })
-        .attr('r', d.r0)
-        .on('end', breath)
+        .ease(d3Ease(deflate(d.category)));
+
+      circle
+        .transition(tInflate)
+        .attr('transform', "scale(" + scaleInf + ")")
+        .transition(tDeflate)
+        .attr('transform', "scale(1)")
+        .on('end', breath);
+
+      line
+        .transition(tInflate)
+        .attr('transform', "scale(" + scaleInf + ")")
+        .transition(tDeflate)
+        .attr('transform', "scale(1)")
     })()
   }
 };

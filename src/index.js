@@ -176,6 +176,7 @@ let layout = (function(){
       .style('stroke', function (d) {
         return d.stroke;
       })
+      .attr('transform', "scale(1)")
       .each(function(d){
         // add dynamic r getter
         let n= select(this);
@@ -243,6 +244,7 @@ let layout = (function(){
       .attr('stroke',  function (d) {
         return d.stroke;
       })
+      .attr('transform', "scale(1)")
       .each(function(d){
         // add dynamic x getter
         var n= select(this);
