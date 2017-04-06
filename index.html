@@ -10,16 +10,6 @@
             margin:0;
             padding:0;
         }
-
-        #histogram rect{
-            will-change: height;
-            -webkit-transition: all 0.1s linear;
-            -moz-transition: all 0.1s linear;
-            -o-transition: all 0.1s linear;
-            transition: all 0.1s linear;
-            outline: 1px red;
-        }
-
         #bubble-cloud {
             background: url("http://dummyimage.com/100x100/111/494d05?text=sample") 0 0;
             width: 960px;
@@ -36,14 +26,23 @@
             stroke: red;
             fill: none;
         }
-        .nodes circle {
+        g.nodes {
             cursor: pointer;
-            will-change: r, cx, cy;
-            /*will-change: transform;*/
+            /*will-change: r, cx, cy;*/
+            will-change: transform;
+            transform: translateZ(0);
+            perspective: 1000px;
         }
-        .nodes line {
+        /*.nodes circle {*/
+            /*cursor: pointer;*/
+            /*will-change: r, cx, cy;*/
+            /*!*will-change: transform;*!*/
+        /*}*/
+        g.nodes line {
             cursor: pointer;
             will-change: x1, x2;
+            transform: translateZ(0);
+            perspective: 1000px;
             /*will-change: transform;*/
         }
         .nodes text {

@@ -2,16 +2,18 @@
  * index
  * Created by cool.blue on 20/03/2017.
  */
-import FpsMeter from '../src/d3-fps-histogram'
+import FpsMeter from '../../d3-fps/src/d3-fps-histogram'
 import {select, event} from 'd3-selection'
 import 'd3-selection-multi'
 import {drag} from 'd3-drag'
-import {dispatch} from 'd3-dispatch'
 import {format} from 'd3-format'
 import {forceSimulation, forceX, forceY, forceCollide, forceCenter} from 'd3-force'
 import {range} from 'd3-array'
 import animate from './animate';
+import selectElement from '../src/d3-select-element'
 // import collide from '../src/collide'
+
+const containerWidth = 960;
 
 // helpers
 let random = function (min, max) {
@@ -22,9 +24,8 @@ let random = function (min, max) {
     return min + Math.floor(Math.random() * (max - min + 1));
   },
   metrics = select('#bubble-cloud').append("div")
-    .attr("id", "metrics")
-    .style("white-space", "pre"),
-  hist = FpsMeter("#metrics", {display: "inline-block"}, {
+    .attr("id", "metrics"),
+  hist = FpsMeter("#metrics", {display: "block"}, {
     height: 10, width: 100,
     values: function (d) {
       return 1 / d
@@ -34,6 +35,15 @@ let random = function (min, max) {
     .message(function (value, this_lap, aveLap) {
       return 'alpha:' + format(" >7,.3f")(value)
     }),
+  rendererSelect = selectElement({
+    base: "#metrics",
+    style: {float: "right", top: 0 + "px"},
+    onchange: function() {
+      layout.restart(this.value)
+    },
+    data: ["Velocity", "d3", "d3Scale"],
+    initial: "Velocity"
+  }),
   // mock data
   colors = [
     {
@@ -52,7 +62,6 @@ let random = function (min, max) {
 
 // initialize
 let container = select('#bubble-cloud');
-const containerWidth = 960;
 let containerHeight = 470 - hist.selection.node().clientHeight;
 let svgContainer = container
   .append('svg')
@@ -63,8 +72,7 @@ let jiggle = function() {
   return (Math.random() - 0.5) * 1e-6;
 };
 
-const data = [],
-  rScale = 0.3,
+const rScale = 0.3,
   Rmin = 30,
   Rmax = 60,
   rmin = Rmin*rScale,
@@ -78,8 +86,10 @@ const data = [],
   groupDomain = range(groups + 1),
   groupXY = groupDomain.map((d, i) => {
     return {x: containerWidth/2 + jiggle(), y: containerHeight/2 + jiggle()}
-  });
+  }),
+  alphaCool = 0.7;
 
+let data = [];
 catRange.forEach(function(j){
   textRange.forEach(function(i){
     let r = random(rmin, rmax);
@@ -132,15 +142,16 @@ function radius(d) {
 }
 
 let layout = (function(){
-  let nodes, circles, lines, force;
+  let nodes, node, circles, lines, force;
 
   // create item groups
-  function init(data){
+  function init(data, restart){
 
-    data.forEach(function(d){
-      d.x = d.gX + jiggle();
-      d.y = d.gY + jiggle();
-    });
+    if(!restart)
+      data.forEach(function(d){
+        d.x = d.gX + jiggle();
+        d.y = d.gY + jiggle();
+      });
 
     let G = d => [1, 10][+!!d.category] * baseG;
     force = forceSimulation(data)
@@ -156,16 +167,21 @@ let layout = (function(){
 
     force.stop();
 
-    hist.start(100);
-
     nodes = svgContainer.selectAll('.nodes')
-      .data(data)
+      .data([data])
       .enter()
       .append('g')
       .attr('class', 'nodes');
 
+    node = nodes.selectAll('.node')
+      .data(function(d) { return d; })
+      .enter()
+      .append('g')
+      .attr('class', 'node');
+    node.exit().remove();
+
     // create circles
-    circles = nodes.append('circle')
+    circles = node.append('circle')
       .classed('circle', true)
       .attr('r', function (d) {
         return d.r;
@@ -186,7 +202,7 @@ let layout = (function(){
       });
 
     // create labels
-    nodes.append('text')
+    node.append('text')
       .text(function(d) {
         return 'text' + d.text
       })
@@ -206,7 +222,7 @@ let layout = (function(){
         return - rmax/5;
       });
 
-    nodes.append('text')
+    node.append('text')
       .text(function(d) {
         return 'Cat ' + d.category
       })
@@ -224,7 +240,7 @@ let layout = (function(){
         return rmax/3;
       });
 
-    lines = nodes.append('line')
+    lines = node.append('line')
       .classed('line', true)
       .attrs({
         x1: function (d) {
@@ -286,12 +302,12 @@ let layout = (function(){
       .on("end", dragended));
 
     tick.force = force;
-    tick.nodes = nodes;
+    tick.nodes = node;
 
-    // force.force("collide").initialize(force.nodes());
+    // force.force("collide").initialize(force.node());
     t();
 
-    return {nodes: nodes, circles: circles, lines: lines, force: force}
+    return {nodes: node, circles: circles, lines: lines, force: force}
   }
 // put circle into movement
   function t(){
@@ -312,10 +328,20 @@ let layout = (function(){
     let a = force.alpha();
     hist.mark(a);
 
-    nodes
-      .attr("transform", function position(d){
-        return "translate(" + [d.x, d.y] + ")"
-      });
+    // node
+    //   .attr("transform", function position(d){
+    //     return "translate(" + [d.x, d.y] + ")"
+    //   });
+    Velocity(node.nodes(), {
+      translateX: function () {
+        let d = select(this).datum();
+        return d.x;
+      },
+      translateY: function () {
+        let d = select(this).datum();
+        return d.y;
+      }
+    }, 0);
     return this;
   }
   // remote tick function
@@ -324,18 +350,21 @@ let layout = (function(){
     force.tick();
     t()
   }
+  function restart(renderer){
+    // data = data.map(d => Object.assign({}, this.animate.unSchedule(d)));
+    this.animate = animate({force: true, renderer: renderer});
+    outerForce.alpha(alphaCool).restart();
+    this._init();
+  }
   return {
     init: init,
-    animate: animate({tick: tick, rmax: rmax, renderer: "d3"}),
+    animate: animate({tick: tick, rmax: rmax, renderer: rendererSelect.value()}),
+    restart: restart
   }
 })();
 
 let baseG = 0.1;
-let baseQ = -300;
-
 let groupR = 60;
-let alphaCool = 0.7;
-let forceEvents = dispatch('cooled');
 let outerForce = forceSimulation(groupXY)
   .force("center", forceCenter(containerWidth/2, containerHeight/2))
   .force('X', forceX(containerWidth/2).strength(baseG*containerHeight/containerWidth))
@@ -360,3 +389,5 @@ let groupNodes = svgContainer.selectAll('.group-node')
   .append('circle')
   .attr('r', groupR)
   .attr('class', 'group-node');
+
+hist.start(100);
